@@ -52,7 +52,7 @@ def create_game(money, range_start, cur_location, p_name, g_goal, start_score, a
             encounter_list.append(re['re_id'])
 
     # exclude starting airport
-    g_ports = a_ports[1:].copy()
+    g_ports = a_ports.copy()
     random.shuffle(g_ports)
 
     for i, re_id in enumerate(encounter_list):
@@ -262,8 +262,12 @@ def high_scores():
 def high_score_list():
     print("\x1b[31mTOP 10:\x1b[0m")
     all = high_scores()
+    count = 0
     for i in all:
-        print(i['screen_name'], i['score'])
+        count += 1
+        name = i['screen_name']
+        score = i['score']
+        print(f'{count}. {name}, {score}')
 
 
 def press_enter():
@@ -314,6 +318,7 @@ while stamps < 5:
 [2] KAUPPA: Osta kilometrejä
 [3] PANKKI: Ota lainaa
 [99] POISTU PELISTÄ \033[0m""")
+    print('')
     try:
         menu = int(menu)
     except ValueError:
@@ -434,7 +439,7 @@ credits = input("Haluatko nähdä lopputekstit? [Y/N] ")
 
 if credits.upper() == "Y":
     print('''
-    \033[94m\033[1mEUROTRIP\033[1m\033[0m
+\033[94m\033[1mEUROTRIP\033[1m\033[0m
 Elina Kajava
 Joonas Ronimus
 Santtu Saaranen
