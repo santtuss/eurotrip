@@ -1,6 +1,7 @@
 import random
 from geopy import distance
 import mysql.connector
+import story
 
 conn = mysql.connector.connect(
     host='localhost',
@@ -236,6 +237,12 @@ def update_location(game_id, range, money, location):
     cursor.execute(sql, (location, range, money, game_id,))
 
 
+def update_score(game_id, score):
+    sql = f'''UPDATE game SET score = %s WHERE id = %s'''
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute(sql, (score, game_id,))
+
+
 def is_valid(icao):
     this_all_airports = get_airports()
     for i in this_all_airports:
@@ -244,10 +251,36 @@ def is_valid(icao):
     return False
 
 
+def high_scores():
+    sql = f'SELECT screen_name, score FROM game WHERE score IS NOT NULL ORDER BY score asc LIMIT 10;'
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute(sql)
+    result = cursor.fetchall()
+    return result
+
+
+def high_score_list():
+    print("\x1b[31mTOP 10:\x1b[0m")
+    all = high_scores()
+    for i in all:
+        print(i['screen_name'], i['score'])
+
+
+def press_enter():
+    print('')
+    input("\033[93mPaina [ENTER] jatkaaksesi >> \033[0m")
+    print('')
+
+
 print("\033[94m\033[1mEUROTRIP\033[1m\033[0m")
 name = input("Syötä nimesi aloittaaksesi: ")
 stamps = 0
 game_over = 0
+
+print_story = input("Haluatko kuulla pelin tarinan? [Y/N] ")
+if print_story.upper() == "Y":
+    print(story.story)
+    press_enter()
 
 # aloitusasetukset
 money = 2000
@@ -256,28 +289,28 @@ all_airports = get_airports()
 start_airport = "EFHK"
 current_airport = start_airport
 goal = random_goal()
-loan_taken = 0
+loan_taken = None
 
 game_id = create_game(money, player_range, start_airport, name, goal, loan_taken, all_airports)
 
+loan_taken = 0
+
 if goal == 1:
-    print("Tavoitteesi on kerätä leimat Euroopan suurimmista kaupungeista!")
-    print("Kerää 5 leimaa voittaaksesi.")
+    print("\033[93mTavoitteesi on kerätä leimat Euroopan suurimmista kaupungeista!")
 elif goal == 2:
-    print("Tavoitteesi on kerätä leimat Euroopan vilkkaimmista lentokentistä!")
-    print("Kerää 5 leimaa voittaaksesi.")
+    print("\033[93mTavoitteesi on kerätä leimat Euroopan vilkkaimmista lentokentistä!")
 elif goal == 3:
-    print("Tavoitteesi on kerätä leimat Euroopan pääkaupungeista!")
-    print("Kerää 5 leimaa voittaaksesi.")
+    print("\033[93mTavoitteesi on kerätä leimat Euroopan pääkaupungeista!")
+print("\033[0mKerää 5 leimaa voittaaksesi.")
+print("Mitä pienemmällä lainalla selviät, sitä enemmän pisteitä saat!")
 
 
 while stamps < 5:
     airport = get_airport_info(current_airport)
-    print(f"Olet tässä: {airport['name']}")
+    print(f"\x1b[31mOlet tässä:\x1b[0m {airport['name']}")
     print(f"Sinulla on {money:.0f} € ja {player_range:.0f} km käytössäsi")
-    input("\033[93mPaina [ENTER] jatkaaksesi >> \033[0m")
-    menu = input("""\033[92m
-[1] LENTOKENTTÄ: Mene seuraavaan kohteeseen
+    press_enter()
+    menu = input("""\033[92m[1] LENTOKENTTÄ: Mene seuraavaan kohteeseen
 [2] KAUPPA: Osta kilometrejä
 [3] PANKKI: Ota lainaa
 [99] POISTU PELISTÄ \033[0m""")
@@ -296,7 +329,12 @@ while stamps < 5:
             m = i['municipality']
             i = i['ident']
             d = get_distance(current_airport, i)
-            print(f'{n}, \033[92m{m}\033[0m ({i}) {d:.0f} km')
+            visited = check_if_visited(game_id, i)
+            if visited == 1:
+                add_string = '\x1b[31m (Käyty)\x1b[0m'
+            elif visited == 0:
+                add_string = ''
+            print(f'{n}, \033[92m{m}\033[0m ({i}) {d:.0f} km' + add_string)
         icao = input(f"""Kilometrejä käytössä: {player_range:.0f} km
 \033[94mMinne haluat matkustaa?\033[0m
 Syötä ICAO-koodi TAI [X] jos haluat peruuttaa """)
@@ -332,7 +370,7 @@ Syötä ICAO-koodi TAI [X] jos haluat peruuttaa """)
                 print(f"Täällä ei ollut leimaa!")
             if check == 1:
                 print(f"Täällä oli leima!")
-                print("+1 leima")
+                print("\033[92m+1 leima\033[0m")
                 stamps = stamps + 1
                 print(f"Leimojen määrä: {stamps}")
             if check == 2:
@@ -342,7 +380,7 @@ Syötä ICAO-koodi TAI [X] jos haluat peruuttaa """)
                 testi = check_which_re(game_id, icao)
                 print(testi)
         else:
-            print("Lentokenttä ei kilometrien säteellä tai invalidi ICAO-koodi.")
+            print("\033[1;37;40mLentokenttä ei kilometrien säteellä tai invalidi ICAO-koodi.\033[0m")
     elif menu == 2:
         print("Tervetuloa kauppaan!")
         print(f"Sinulla on {money:.0f} € ja {player_range:.0f} km käytössäsi.")
@@ -362,9 +400,9 @@ Syötä ICAO-koodi TAI [X] jos haluat peruuttaa """)
                 else:
                     pass
             else:
-                print("Invalidi määrä.")
+                print("\033[1;37;40mInvalidi määrä.\033[0m")
         except ValueError:
-            print("Invalidi kilometrimäärä.")
+            print("\033[1;37;40mInvalidi kilometrimäärä.\033[0m")
     elif menu == 3:
         print("Tervetuloa pankkiin.")
         print(f"Sinulla on vain {money:.0f} €...")
@@ -376,17 +414,30 @@ Syötä ICAO-koodi TAI [X] jos haluat peruuttaa """)
                 money += loan
                 loan_taken += loan
             else:
-                print("Invalidi määrä.")
+                print("\033[1;37;40mInvalidi määrä.\033[0m")
         except ValueError:
-            print("Invalidi määrä.")
+            print("\033[1;37;40mInvalidi määrä.\033[0m")
     elif menu == 99:
         break
     else:
-        print("Invalidi menukoodi.")
+        print("\033[1;37;40mInvalidi menukoodi.\033[0m")
 
 if stamps >= 5:
-    print("Jee voitit pelin jee jee jee")
+    update_score(game_id, loan_taken)
+    print("\033[93mVoitit pelin!\033[0m")
+    print(f"Pisteet: {loan_taken}")
+    high_score_list()
 elif game_over == 1:
-    print("Game Over")
-else:
-    print("Byebye")
+    print("\x1b[31mGAME OVER:\x1b[0m Rahat loppuivat!")
+
+credits = input("Haluatko nähdä lopputekstit? [Y/N] ")
+
+if credits.upper() == "Y":
+    print('''
+    \033[94m\033[1mEUROTRIP\033[1m\033[0m
+Elina Kajava
+Joonas Ronimus
+Santtu Saaranen
+Sergei Vilka
+Metropolia Ammattikorkeakoulu, 2023
+''')
