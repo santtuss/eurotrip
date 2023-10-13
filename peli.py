@@ -44,14 +44,12 @@ def create_game(money, range_start, cur_location, p_name, g_goal, start_score, a
     cursor.execute(sql, (money, range_start, cur_location, p_name, g_goal, start_score))
     g_id = cursor.lastrowid
 
-    # add random encounters
     random_encounters = get_encounters()
     encounter_list = []
     for re in random_encounters:
         for i in range(0, re['probability'], 1):
             encounter_list.append(re['re_id'])
 
-    # exclude starting airport
     g_ports = a_ports.copy()
     random.shuffle(g_ports)
 
@@ -81,21 +79,12 @@ def get_game_info(game_id):
     return result
 
 
-# funktio reference
-# parametrina goal_id (esim. 1)
-# palauttaa sitä vastaavan "reference" kolumnin arvon (esim. "population")
-
-
 def reference(goal_id):
     sql = f'SELECT reference FROM goal WHERE goal_id = (%s);'
     cursor = conn.cursor(dictionary=True)
     cursor.execute(sql, (goal_id,))
     ref = cursor.fetchone()
     return ref['reference']
-
-
-# funktio check_if_visited
-# parametreina game_id (game-taulun primary key, "mikä peli?") ja current_location (icao-koodi)
 
 
 def check_if_visited(game_id, current_location):
@@ -105,17 +94,12 @@ def check_if_visited(game_id, current_location):
     cursor = conn.cursor(dictionary=True)
     cursor.execute(sql, (game_id, current_location,))
     fetched = cursor.fetchone()
-    # list() tekee sql syöttämästä taulukosta python listan (eos miten muuten sen yksittäisen arvon olisi saanut)
+    # list() tekee sql syöttämästä taulukosta python listan
     result = list(fetched.values())[0]
     if result == 1:
         return True
     else:
         return False
-
-
-# funktio update_visited_status
-# parametreina game_id (mistä pelistä updatetaan tiedot?) ja location (missä ollaan käyty?)
-# ei sinänsä palauta mitään, lisää tiedot tietokantaan
 
 
 def update_visited_status(game_id, location):
@@ -126,14 +110,6 @@ def update_visited_status(game_id, location):
         sql = f'INSERT INTO visited_city VALUES (%s, %s, 1);'
         cursor = conn.cursor(dictionary=True)
         cursor.execute(sql, (game_id, location))
-
-
-# funktio check_if_goal
-# parametreina game_id (mikä peli?) player_location (missä pelaaja on?) goal_id (mitä goalia pelajaa yrittää tehdä?)
-# palauttaa 0, 1 tai 2
-# 0 = lentokentältä ei saa leimaa
-# 1 = lentokentältä saa leiman
-# 2 = lentokentällä on käyty jo aiemmin
 
 
 def check_if_goal(game_id, player_location, goal_id):
@@ -155,12 +131,6 @@ def check_if_goal(game_id, player_location, goal_id):
     return check
 
 
-# funktio check_if_re
-# game_id ja player_locationin perusteella selvittää, onko paikassa random_encounteria
-# (encounter_location taulu)
-# palauttaa 0 jos ei ole, 1 jos on, 2 jos on käyty jo
-
-
 def check_if_re(game_id, player_location):
     check = 0
     if check_if_visited(game_id, player_location):
@@ -174,11 +144,6 @@ def check_if_re(game_id, player_location):
         if result == 1:
             check = 1
     return check
-
-
-# funktio check_which_re
-# game_id, location
-# palauttaa re_id
 
 
 def check_which_re(game_id, location):
@@ -199,11 +164,6 @@ def effect_string(re_id):
     cursor.execute(sql, (re_id,))
     ref = cursor.fetchone()
     return ref['effect']
-
-
-# funktio re_effect
-# ottaa parametrit game_id ja location
-# updatee tietokantaan haluttu efekti (esim. poistaa 500 rahaa)
 
 
 def re_info(game_id, location):
@@ -266,8 +226,11 @@ def high_score_list():
     for i in all:
         count += 1
         name = i['screen_name']
-        score = i['score']
-        print(f'{count}. {name}, {score}')
+        score = str(i['score'])
+        dot_amount = 20 - len(name) - len(score)
+        dots = dot_amount * '.'
+        print(f'{count}. {name} {dots} {score}')
+    print('')
 
 
 def press_enter():
@@ -286,7 +249,6 @@ if print_story.upper() == "Y":
     print(story.story)
     press_enter()
 
-# aloitusasetukset
 money = 2000
 player_range = 800
 all_airports = get_airports()
@@ -317,7 +279,8 @@ while stamps < 5:
     menu = input("""\033[92m[1] LENTOKENTTÄ: Mene seuraavaan kohteeseen
 [2] KAUPPA: Osta kilometrejä
 [3] PANKKI: Ota lainaa
-[99] POISTU PELISTÄ \033[0m""")
+[99] POISTU PELISTÄ \033[0m
+""")
     print('')
     try:
         menu = int(menu)
@@ -337,10 +300,11 @@ while stamps < 5:
             visited = check_if_visited(game_id, i)
             if visited == 1:
                 add_string = '\x1b[31m (Käyty)\x1b[0m'
-            elif visited == 0:
+            else:
                 add_string = ''
             print(f'{n}, \033[92m{m}\033[0m ({i}) {d:.0f} km' + add_string)
-        icao = input(f"""Kilometrejä käytössä: {player_range:.0f} km
+        icao = input(f"""\033[93mKilometrejä käytössä: {player_range:.0f} km
+        
 \033[94mMinne haluat matkustaa?\033[0m
 Syötä ICAO-koodi TAI [X] jos haluat peruuttaa """)
         icao = icao.upper()
@@ -352,6 +316,7 @@ Syötä ICAO-koodi TAI [X] jos haluat peruuttaa """)
             re_check = check_if_re(game_id, icao)
             if re_check == 1:
                 encounter_info = re_info(game_id, icao)
+                print(encounter_info['re_description'])
                 re_value = encounter_info['value']
                 re_effect = encounter_info['effect']
                 if re_effect == "range_budget":
@@ -366,7 +331,6 @@ Syötä ICAO-koodi TAI [X] jos haluat peruuttaa """)
                         else:
                             print("Rahat loppuivat!")
                             print("\033[93mVinkki: Voit vielä nostaa rahaa pankista!\033[0m")
-                print(encounter_info['re_description'])
             update_visited_status(game_id, icao)
             update_location(game_id, player_range, money, icao)
             current_airport = icao
@@ -411,11 +375,11 @@ Syötä ICAO-koodi TAI [X] jos haluat peruuttaa """)
     elif menu == 3:
         print("Tervetuloa pankkiin.")
         print(f"Sinulla on vain {money:.0f} €...")
-        print(f"Maksimimäärä per peli: 50000 € / Lainaa otettu: {loan_taken} €")
+        print(f"Maksimimäärä per peli: 30000 € / Lainaa otettu: {loan_taken} €")
         loan = input("Paljonko lainaa haluat ottaa? ")
         try:
             loan = int(loan)
-            if loan >= 0 and loan_taken + loan <= 50000:
+            if loan >= 0 and loan_taken + loan <= 30000:
                 money += loan
                 loan_taken += loan
             else:
@@ -431,6 +395,7 @@ if stamps >= 5:
     update_score(game_id, loan_taken)
     print("\033[93mVoitit pelin!\033[0m")
     print(f"Pisteet: {loan_taken}")
+    print("")
     high_score_list()
 elif game_over == 1:
     print("\x1b[31mGAME OVER:\x1b[0m Rahat loppuivat!")
